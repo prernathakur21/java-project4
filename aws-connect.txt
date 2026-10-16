@@ -1,0 +1,36 @@
+
+pipeline {
+    agent any
+
+    environment {
+        EC2_PUBLIC_IP = '16.170.236.50'
+    }
+
+    stages {
+        stage('Connect to AWS EC2') {
+            steps {
+                withCredentials([
+                    sshUserPrivateKey(
+                        credentialsId: 'aws-cred',
+                        keyFileVariable: 'SSH_KEY',
+                        usernameVariable: 'SSH_USER'
+                    )
+                ]) {
+                    bat '''
+                        echo Fixing SSH key permissions...
+
+                        icacls "%SSH_KEY%" /inheritance:r
+                        icacls "%SSH_KEY%" /grant:r "*S-1-5-18:R"
+                        icacls "%SSH_KEY%" /remove:g "*S-1-5-32-545"
+
+                        if errorlevel 1 exit /b 1
+
+                        echo Connecting to AWS EC2...
+
+                        ssh -i "%SSH_KEY%" -o StrictHostKeyChecking=accept-new %SSH_USER%@%EC2_PUBLIC_IP% "echo Connected to EC2 && whoami && hostname"
+                    '''
+                }
+            }
+        }
+    }
+}
